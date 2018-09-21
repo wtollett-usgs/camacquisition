@@ -1,0 +1,152 @@
+#!/bin/tcsh
+
+set configFile=""
+set dateFlag=""
+set webcopy="true"
+set usage="Usage: $0 -c configfile [-d datestring] [-h] [-w]"
+
+set argv=`getopt "c:d:hw" $*`
+
+if ($status != 0) then
+	echo "$usage"
+	exit 1
+endif
+
+# parse arguments
+while ("$1" != "")
+	switch($1)
+		case "-c":
+			set configFile="$2"
+			shift
+			breaksw
+		case "-d":
+			set dateFlag="-d $2"
+			shift
+			breaksw
+		case "-h":
+			echo "$usage"
+			exit 1
+		case "-w":
+			set webcopy="false"
+			shift
+			breaksw
+	endsw
+	shift
+end
+		
+if ("$configFile" == "") then
+	echo "$usage"
+	exit 1
+endif
+
+# check for the config file
+if (-e $configFile && -r $configFile) then
+    source $configFile
+else
+	echo "$configFile does not exist and/or is not readable"
+    exit 1
+endif
+
+# used for proper permissioning
+umask 002
+
+# script configuration
+set date		= `date $dateFlag +"%Y %m %d"`
+set compDate	= "$date[1]$date[2]$date[3]"
+set compDir		= "/data/cams/$cameraCode/composites"
+set archDir		= "$compDir/archive/$date[1]/$date[2]"
+set imageDir	= "/data/cams/$cameraCode/images/archive"
+set scriptLog	= "/var/log/cams/$cameraCode.composite.log"
+set jsFile		= "$cameraCode.composite.js"
+set tmpDir		= "/tmp"
+set scriptDir	= "/app/camacquisition/bin"
+
+#.setenv MATLAB /ikaika/software/matlab
+# set MATLABPATH	= ($MATLAB $MATLAB/bin $MATLAB/toolbox $scriptDir/bin)
+# set path		= ($MATLABPATH $path)
+
+# create a header for the log file for this composite creation
+#setenv LD_LIBRARY_PATH
+#setenv LD_LIBRARY_PATH /usr/local/lib:$LD_LIBRARY_PATH
+
+echo "$cameraCode BEGIN COMPOSITE CREATION `date +%c`" > $scriptLog
+
+echo "creating archive directory" >> $scriptLog
+mkdir -p $archDir
+
+# add in the pan name if this camera creates pans
+if ($#name > 1) then
+	set name = ($name "PAN")
+endif
+
+# start at the first camera frame
+@ i = 1
+
+# loop through for each camera frame
+while ($i < $#name + 1)
+
+	cd $scriptDir
+
+	if ($name[$i] == "PAN") then
+		set frameWidth	= $panWidth
+		set frameHeight	= $panHeight
+	else
+		set frameWidth	= $imageWidth
+		set frameHeight	= $imageHeight
+	endif
+
+	# set the image name
+	set imageName	= "${cameraCode}${compDate}$name[$i].jpg"
+	echo "\ncreating $imageName `date +%c`" >> $scriptLog
+
+	# create the composite image
+	#matlab -nodisplay -nodesktop -nojvm -nosplash -r "composites_daily('$cameraCode','$name[$i]','$frameWidth','$frameHeight','$compDate','$tmpDir');quit;" >>& $scriptLog
+	python composites_daily.py $cameraCode $name[$i] $frameWidth $frameHeight $compDate $tmpDir >>& $scriptLog
+
+	# copy the image over to the library
+	echo "cp $tmpDir/$imageName to $archDir" >> $scriptLog
+	cp $tmpDir/$imageName $archDir >>& $scriptLog
+
+	if ($webcopy == "true") then
+		# copy the image over to the webserver library
+		echo "cp $tmpDir/$imageName to $compDir/$name[$i].jpg" >> $scriptLog
+		cp $tmpDir/$imageName $compDir/$name[$i].jpg >>& $scriptLog
+	endif
+
+	# removie the tmp image
+	echo "rm $tmpDir/$imageName" >> $scriptLog
+	rm -f $tmpDir/$imageName
+
+	# goto the next frame
+	@ i++
+
+end
+
+# create a timestamp for this creation
+set date        = `date +"%Y %m %d %H %M"`
+set imageDate   = "${date[1]}-${date[2]}-${date[3]} ${date[4]}:${date[5]} (HST)"
+
+# update the timestamp
+echo 'var datetime = "'$imageDate'";'	>  $tmpDir/$jsFile
+echo -n 'var frames   = new Array('		>> $tmpDir/$jsFile
+@ i = 1
+while ($i < $#name + 1)
+    if ($i != $#name) then
+        echo -n '"'$name[$i]'",'		>> $tmpDir/$jsFile
+    else
+        echo -n '"'$name[$i]'"'			>> $tmpDir/$jsFile
+    endif
+    @ i++
+end
+echo ');'								>> $tmpDir/$jsFile
+
+if ($webcopy == "true") then
+	echo "cp $tmpDir/$jsFile to $compDir/js.js"   >> $scriptLog
+	cp $tmpDir/$jsFile $compDir/js.js >>& $scriptLog
+endif
+
+echo "rm $tmpDir/$jsFile" >> $scriptLog
+rm -f $tmpDir/$jsFile >>& $scriptLog
+
+# create a footer for the log file
+echo "$cameraCode END COMPOSITE CREATION `date +%c`" >> $scriptLog

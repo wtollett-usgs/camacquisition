@@ -1,0 +1,270 @@
+#!/bin/tcsh
+
+set configFile=""
+set usage="Usage: $0 -c configFile [-h]"
+
+set argv=`getopt "c:h" $*`
+
+if ($status != 0) then
+	echo "$usage"
+	exit 1
+endif
+
+# parse arguments
+while ("$1" != "")
+	switch($1)
+		case "-c":
+			set configFile="$2"
+			shift
+			breaksw
+		case "-h":
+			echo "$usage"
+			exit 1
+	endsw
+	shift
+end
+
+if ("$configFile" == "") then
+	echo "$usage"
+	exit 1
+endif
+
+# check for the config file
+if (-e $configFile && -r $configFile) then
+	source $configFile
+else
+	echo "$configFile does not exist and/or is not readable"
+	exit 1
+endif
+
+# used for proper permissioning
+umask 002
+
+# script configuration
+set date		= `date +"%Y %m %d %H %M"`
+set imgDir		= "/data/cams/$cameraCode/images"
+set archDir		= "$imgDir/archive/$date[1]/$date[2]/$date[3]/$date[4]"
+set logDir		= "/var/log/cams"
+set binDir		= "/app/camacquisition/bin"
+set scriptLog	= "$logDir/$cameraCode.script.log"
+set wgetLog		= "$logDir/$cameraCode.wget.log"
+set errorLog	= "$logDir/$cameraCode.error.log"
+set jsFile		= "$cameraCode.tmpimg.js"
+set tmpDir		= "/tmp"
+set emailList	= "lantolik@usgs.gov "
+set emailList	= "wtollett@usgs.gov mpatrick@usgs.gov kevank@usgs.gov "
+set imageArgs	= ""
+@ scriptError	= 0
+
+# reset the log files on an hourly basis, all images are first downloaded either on the 00 minute or the 01 minute, so 2 is a reasonable asusmption
+if ($date[5] < $interval) then
+	rm -f $scriptLog $wgetLog $errorLog >>& /dev/null
+endif
+
+# build up the error log if it doesn't exist
+if (! -e $errorLog) then
+	echo "@ errorCount = 0" >> $errorLog
+	echo "@ emailSent = 0" >> $errorLog
+endif
+
+# get the current error count up to this time 
+source $errorLog
+
+# create a header for the log file for this download instance
+echo "$cameraCode BEGIN DOWNLOAD `date +%c`" >> $scriptLog
+
+# create a local, temporary copy of the image dir
+echo "    creating archive directory" >> $scriptLog
+mkdir -p $archDir >>& $scriptLog
+
+# ping the device to make sure it is awake
+ping -c 3 $cameraIP | sed "s/^/    /" >>& $scriptLog
+
+# start at the first camera angle
+@ i = 1
+		
+# loop through for each camera angle
+while ($i < $#name + 1)
+
+	# setup the date, this is used to store the image in the proper place, make the filename, etc, etc
+	set date			= `date +"%Y %m %d %H %M %S"`
+	set tmpImageName	= "$cameraCode$name[$i].tmpimg.jpg"
+	set imageName		= "$name[$i].jpg"
+	set archImageName	= "$date[1]$date[2]$date[3]$date[4]$date[5]$date[6]$name[$i].jpg"
+	set tmpThumbName	= "$cameraCode$name[$i].thumb.tmpimg.jpg"
+	set thumbName		= "$name[$i].thumb.jpg"
+
+	# send the request to get the image from the camera, wait for it to come back
+	# wget options description 
+	# -t 1:		only lets the script try to get images one time, no retries.  
+	#			this is good because if you keep trying, then the next instance of the script is going to get backed up.
+	#			we want the script to be done in one minute or less, whether it succeeds or not
+	# -T 9: 	this is the timeout, this is best to be 60 seconds divided by the number of images in the panorama, possibly minus 1 or 2 for a quicker runtime
+	if ($camType == "CanonVB-C50i") then
+		wget -a $wgetLog -v -t 1 -T $timeout[$i] -O$tmpDir/$tmpImageName "http://$cameraIP/-wvhttp-01-/GetStillImage?zoom=$zoom[$i]&tilt=$tilt[$i]&pan=$pan[$i]&delay=$delay[$i]" && wait >>& $scriptLog
+
+	else if ($camType == "DLinkDCS-900") then
+		wget -a $wgetLog -v -t 1 -T $timeout[$i] -O$tmpDir/$tmpImageName "http://$cameraIP/image.jpg" && wait >>& $scriptLog
+
+	else if ($camType == "NetcamSC") then
+		wget -a $wgetLog -v -t 1 -T $timeout[$i] -O$tmpDir/$tmpImageName "http://$cameraIP/image.jpg" && wait >>& $scriptLog
+
+	else if ($camType == "FlirCB-620x") then
+		wget -a $wgetLog -v -t 1 -T $timeout[$i] --user Admin --password 1234 -O$tmpDir/$tmpImageName "http://$cameraIP/cgi-bin/jpg/image.cgi" && wait >>& $scriptLog
+	
+	endif
+
+	# get the return value of the wget command, we'll use this in a few places
+	@ wgetReturnVal	= $?
+
+	# if the request was successful then try to upload it to the library
+	if ($wgetReturnVal == 0) then
+
+		# check to see if an image got downloaded, and it actually has image content
+		set fileexists = `find $tmpDir/$tmpImageName -size +${minImageSize}k`
+
+		# if the image did get downloaded then ...
+		if ($fileexists == "$tmpDir/$tmpImageName") then
+
+			echo "    download success: $tmpDir/$tmpImageName" >> $scriptLog
+
+			# trim the KI cam 
+			if ($cameraCode == "KIcam") then
+				echo "	mogrify -chop 0x400+0+0 -gravity south $tmpDir/$tmpImageName" >> $scriptLog
+				mogrify -chop 0x480+0+0 -gravity south $tmpDir/$tmpImageName >>& $scriptLog
+			endif
+
+			# trim the M1 cam 
+			if ($cameraCode == "M1cam") then
+				echo "	mogrify -chop 0x400+0+0 -gravity south $tmpDir/$tmpImageName" >> $scriptLog
+				mogrify -chop 0x400+0+0 -gravity south $tmpDir/$tmpImageName >>& $scriptLog
+			endif
+
+			# copy the image over to the library
+			echo "    cp $tmpDir/$tmpImageName to $archDir/$archImageName" >> $scriptLog
+			cp $tmpDir/$tmpImageName $archDir/$archImageName >>& $scriptLog
+
+    		echo "    mogrify $binDir/usgs_watermark_wht.png $tmpDir/$tmpImageName" >> $scriptLog
+    		mogrify -gravity southwest -draw "image Over 0,0 0,0 '$binDir/usgs_watermark_wht.png'" $tmpDir/$tmpImageName >>& $scriptLog
+
+			# create a thumbnail and copy to webserver
+			echo "    create $tmpDir/$tmpThumbName" >> $scriptLog
+			convert -thumbnail 30% $tmpDir/$tmpImageName $tmpDir/$tmpThumbName >>& $scriptLog
+
+			# copy the image over to the webserver
+			echo "    cp $tmpDir/$tmpImageName to $imgDir/$imageName" >> $scriptLog
+			cp $tmpDir/$tmpImageName $imgDir/$imageName >>& $scriptLog
+			cp $tmpDir/$tmpThumbName $imgDir/$thumbName >>& $scriptLog
+
+			# add this to the panorama command
+			if ($#name > 1) then
+				if ($panHoriz[$i] != "" && $panVert[$i] != "") then
+					set imageArgs = "$imageArgs $tmpDir/$tmpImageName -geometry +$panHoriz[$i]+$panVert[$i] -composite"
+				endif
+			endif
+
+		# if the image did was not found, or if it is unreasonably small, then write out a message to the log file
+		else
+			echo "    find error: $tmpDir/$tmpImageName" >> $scriptLog
+			@ scriptError++
+		endif
+
+	# if the request was not successful
+	else
+		echo "    download error: $tmpDir/$tmpImageName" >> $scriptLog
+		@ scriptError++
+	endif
+
+	# goto the next pan
+	@ i++
+
+end
+
+# create a panorama image if this is a multi frame camera
+if ($#name > 1 && $scriptError < $#name) then
+	set name			= ($name "PAN")
+	set date			= `date +"%Y %m %d %H %M %S"`
+	set tmpImageName	= "${cameraCode}PAN.tmpimg.jpg"
+	set imageName		= "PAN.jpg"
+	set archImageName	= "$date[1]$date[2]$date[3]$date[4]$date[5]PAN.jpg"
+	set tmpThumbName	= "${cameraCode}PAN.thumb.tmpimg.jpg"
+	set thumbName		= "PAN.thumb.jpg"
+
+	echo "    creating panorama image $imageArgs" >> $scriptLog
+	convert -size ${panWidth}x${panHeight} -compress JPEG -quality 50 xc:black $imageArgs $tmpDir/$tmpImageName >>& $scriptLog
+
+	echo "    creating panorama thumb image" >> $scriptLog
+	convert -thumbnail 30% $tmpDir/$tmpImageName $tmpDir/$tmpThumbName >>& $scriptLog
+
+	echo "    cp $tmpDir/$tmpImageName to $archDir and $imgDir" >> $scriptLog
+	cp $tmpDir/$tmpImageName $archDir/$archImageName >>& $scriptLog
+	cp $tmpDir/$tmpImageName $imgDir/$imageName >>& $scriptLog
+	cp $tmpDir/$tmpThumbName $imgDir/$thumbName >>& $scriptLog
+endif
+
+# update the timestamp only if ALL of the images were downloaded successfully
+if ($scriptError == 0) then
+	set date	= `date +"%Y %m %d %H %M %S"`
+	set imageDate	= "${date[1]}-${date[2]}-${date[3]} ${date[4]}:${date[5]}:${date[6]} (HST)"
+	echo 'var datetime = "'$imageDate'";' 		>  $tmpDir/$jsFile
+	echo -n 'var frames   = new Array('   		>> $tmpDir/$jsFile
+	@ i = 1
+	while ($i < $#name + 1)
+		if ($i != $#name) then
+			echo -n '"'$name[$i]'",'     		>> $tmpDir/$jsFile
+		else
+			echo -n '"'$name[$i]'"'      		>> $tmpDir/$jsFile
+		endif
+		@ i++
+	end
+	echo ');'                             		>> $tmpDir/$jsFile
+
+	echo "    cp $tmpDir/$jsFile to $imgDir/js.js" 	>> $scriptLog
+	cp $tmpDir/$jsFile $imgDir/js.js >>& $scriptLog
+
+	# echo "    rm $tmpDir/$jsFile" >> $scriptLog
+	# rm -f $tmpDir/$jsFile >>& $scriptLog
+
+# if there were some errors then we need to update the error log appropriately
+else
+
+	# go ahead and delete the current error log, we will update it now with the current info
+	rm -f $errorLog
+
+	# calculate the new error count and output it to the error log
+	@ errorCount = $errorCount + $scriptError
+	echo "@ errorCount = $errorCount" >> $errorLog
+	echo "    errorCount: $errorCount" >> $scriptLog
+
+	# check to see if the max threshold was met
+	if ($errorCount > $maxErrors) then
+
+		# if the email was already sent then don't need to mail again
+		if ($emailSent == 0) then
+			@ i = 1
+			while ($i < $#emailList + 1)
+				mail -s "$cameraCode error report" $emailList[$i] < $scriptLog
+				@ i++
+			end
+		endif
+
+		# now we can say for sure that the email has been sent
+		echo "@ emailSent = 1" >> $errorLog
+
+	# if it wasn't set then we can definetly set this to 0
+	else 
+		echo "@ emailSent = 0" >> $errorLog
+	endif
+endif
+
+# remove temp images and files
+echo "    rm $tmpDir/${cameraCode}*.tmpimg.*" >> $scriptLog
+rm -f $tmpDir/${cameraCode}*.tmpimg.* >>& $scriptLog
+
+# create a footer for the log file for this download instance
+echo "$cameraCode END DOWNLOAD `date +%c`\n" >> $scriptLog
+
+# send the log files to the library in the hour directory
+cp $scriptLog $archDir
+cp $wgetLog   $archDir
+cp $errorLog  $archDir

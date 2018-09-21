@@ -1,0 +1,4 @@
+imread~=0.4
+numpy~=1.9.0
+Pillow~=3.4.2
+requests~=2.18.4
