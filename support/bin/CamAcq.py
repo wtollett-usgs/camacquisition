@@ -62,9 +62,9 @@ def get(url, auth):
             else:
                 mauth = requests.auth.HTTPBasicAuth(auth['user'],
                                                     auth['passwd'])
-            return requests.get(url, auth=mauth)
+            return requests.get(url, auth=mauth, timeout=20)
         else:
-            return requests.get(url)
+            return requests.get(url, timeout=20)
     except Exception:
         if datetime.now() > NOW + timedelta(seconds=50):
             logger.info('Giving up at: %s' %
