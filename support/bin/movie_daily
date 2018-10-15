@@ -77,7 +77,7 @@ while ($i < $#name + 1)
 
 	# create the movie
 	echo "    creating /tmp/$movieName `date +%c`" >> $scriptLog
-	mencoder mf://@$fileList -mf fps=10 -ovc lavc -lavcopts vcodec=mpeg4:vbitrate=3840000 -o /tmp/$movieName >>& $scriptLog
+	mencoder mf://@$fileList -mf fps=10 -ovc lavc -lavcopts vcodec=mpeg4:vbitrate=14400000 -o /tmp/$movieName >>& $scriptLog
 
 	# move the movie to the web dir for usage
 	echo "    moving /tmp/$movieName to $movieDir/$movieName" >> $scriptLog
