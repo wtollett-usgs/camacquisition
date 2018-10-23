@@ -53,26 +53,30 @@ def close_logs():
 
 
 def get(url, auth):
-    try:
-        if auth:
-            mauth = None
-            if auth['type'] == 'digest':
-                mauth = requests.auth.HTTPDigestAuth(auth['user'],
-                                                     auth['passwd'])
+    with requests.session() as s:
+        s.keep_alive = False
+        try:
+            if auth:
+                mauth = None
+                if auth['type'] == 'digest':
+                    mauth = requests.auth.HTTPDigestAuth(auth['user'],
+                                                         auth['passwd'])
+                else:
+                    mauth = requests.auth.HTTPBasicAuth(auth['user'],
+                                                        auth['passwd'])
+                return requests.get(url, auth=mauth, timeout=20)
             else:
-                mauth = requests.auth.HTTPBasicAuth(auth['user'],
-                                                    auth['passwd'])
-            return requests.get(url, auth=mauth, timeout=20)
-        else:
-            return requests.get(url, timeout=20)
-    except Exception:
-        if datetime.now() > NOW + timedelta(seconds=50):
-            logger.info('Giving up at: %s' %
-                        datetime.now().strftime(TFMT))
-            sys.exit()
-        else:
-            time.sleep(5)
-            return get(url, auth)
+                return requests.get(url, timeout=20)
+        except Exception:
+            if datetime.now() > NOW + timedelta(seconds=50):
+                logger.info('Giving up at: %s' %
+                            datetime.now().strftime(TFMT))
+                sys.exit()
+            else:
+                time.sleep(5)
+                return get(url, auth)
+        finally:
+            s.close()
 
 
 if __name__ == '__main__':
