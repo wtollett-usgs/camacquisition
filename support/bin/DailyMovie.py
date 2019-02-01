@@ -14,13 +14,10 @@ from glob import glob
 
 # Argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', type=str, required=True,
-                    help='Config file')
+parser.add_argument('-c', '--config', type=str, required=False,
+                    help='Config file. If no config file, GOES assumed.')
 parser.add_argument('-d', '--date', type=str, required=False,
                     help="Datetime string (YYYYMMDD) or 'yesterday'")
-
-movie_dir = '/data/cams/{}/movies/'
-image_dir = '/data/cams/{}/images/archive/{}/{}/{}'
 
 
 def read_config(config_file):
@@ -40,7 +37,7 @@ def read_config(config_file):
     return camera_code, name
 
 
-def create_video(camera_code, name, in_date=None):
+def parse_date(in_date=None):
     if in_date:
         if in_date == 'yesterday':
             now = datetime.now() - timedelta(1)
@@ -48,40 +45,66 @@ def create_video(camera_code, name, in_date=None):
             now = datetime.strptime(in_date, '%Y%m%d')
     else:
         now = datetime.now()
-    logger.info('Starting video creation for %s, date = %s'
-                % (camera_code, now.strftime('%Y-%m-%d')))
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    movie_name = f'{camera_code}{year}{month}{day}{name}.avi'
-    tmp_movie = f'/tmp/{movie_name}'
-    filelist = f'{tmp_movie}.movie.txt'
-    m_dir = movie_dir.format(camera_code)
-    i_dir = image_dir.format(camera_code, year, month, day)
+    return str(now.year), str(now.month).zfill(2), str(now.day).zfill(2)
 
-    # Get file list
+
+def get_files(rootdir, filelist):
     files = []
-    for filename in glob(f'{i_dir}/**/*{name}.jpg', recursive=True):
+    for filename in glob(f'{rootdir}/**/*.jpg', recursive=True):
         files.append(filename)
     with open(filelist, 'wb') as f:
         f.write(str.encode('\n'.join(sorted(files))))
+    return files
+
+
+def create_and_copy_video(filelist, tmpmovie, moviedir):
+    # Create movie
+    cmd = ['mencoder', f'mf://@{filelist}', '-mf', 'fps=10', '-ovc',
+           'lavc', '-lavcopts', 'vcodec=mjpeg:vbitrate=1000', '-o',
+           tmpmovie]
+    subprocess.call(cmd)
+    # Copy movie
+    logger.info(f'Copying file to {moviedir}')
+    shutil.copy2(tmpmovie, moviedir)
+    # Delete tmp movie
+    os.remove(tmpmovie)
+
+
+def create_video(imagedir, filelist, tmpmovie, moviedir):
+    # Get file list
+    files = get_files(imagedir, filelist)
 
     if len(files) > 0:
         # Create movie
         logger.debug(f'Found {len(files)} images. Starting encode.')
-        cmd = ['mencoder', f'mf://@{filelist}', '-mf', 'fps=10', '-ovc',
-               'lavc', '-lavcopts', 'vcodec=mjpeg:vbitrate=1000', '-o',
-               tmp_movie]
-        subprocess.call(cmd)
-        # Copy movie
-        logger.info(f'Copying file to {m_dir}')
-        shutil.copy2(tmp_movie, m_dir)
-        # Delete tmp movie
-        os.remove(tmp_movie)
+        create_and_copy_video(filelist, tmpmovie, moviedir)
     else:
         logger.debug("No image files -- exiting")
 
     os.remove(filelist)
+
+
+def goes_video(in_date=None):
+    year, month, day = parse_date(in_date)
+    logger.info(f'Starting goes video creation for {year}-{month}-{day}')
+    movie_name = f'goes{year}{month}{day}.avi'
+    tmp_movie = f'/tmp/{movie_name}'
+    filelist = f'{tmp_movie}.movie.txt'
+    moviedir = f'/data/www/remote_sensing/goes/movies/'
+    imagedir = f'/data/www/remote_sensing/goes/images/{year}/{month}/{day}'
+    create_video(imagedir, filelist, tmp_movie, moviedir)
+
+
+def cam_video(camera_code, name, in_date=None):
+    year, month, day = parse_date(in_date)
+    logger.info('Starting video creation for %s, date = %s'
+                % (camera_code, f'{year}-{month}-{day}'))
+    movie_name = f'{camera_code}{year}{month}{day}{name}.avi'
+    tmp_movie = f'/tmp/{movie_name}'
+    filelist = f'{tmp_movie}.movie.txt'
+    moviedir = f'/data/cams/{camera_code}/movies/'
+    imagedir = f'/data/cams/{camera_code}/images/archive/{year}/{month}/{day}'
+    create_video(imagedir, filelist, tmp_movie, moviedir)
 
 
 if __name__ == '__main__':
@@ -92,7 +115,10 @@ if __name__ == '__main__':
         logger.setLevel(level)
 
     args = parser.parse_args()
-    camera_code, name = read_config(args.config)
-    create_video(camera_code, name, args.date)
+    if args.config:
+        camera_code, name = read_config(args.config)
+        cam_video(camera_code, name, args.date)
+    else:
+        goes_video(args.date)
     logging.info('Finished creating video.')
     logging.shutdown()
