@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import argparse
 import json
@@ -8,6 +9,7 @@ import requests
 import shutil
 import sys
 import time
+import tomputils.util as tutil
 
 from datetime import datetime, timedelta
 from PIL import Image
@@ -25,31 +27,12 @@ TFMT = '%Y-%m-%d %H:%M:%S'
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', type=str, required=True,
                     help='Config file')
-parser.add_argument('-l', '--logfile', type=str, required=False,
-                    help='Logfile location')
-
-# Logging
-logger = logging.getLogger('CamAcq')
-level = logging.getLevelName(os.getenv('LOGLEVEL', 'INFO'))
-logger.setLevel(level)
 
 
 def read_config(configfile):
     logger.debug('Reading configfile: {0}'.format(configfile))
     with open(configfile) as f:
         return json.load(f)
-
-
-def set_logfile(path):
-    fh = logging.FileHandler(path)
-    logger.addHandler(fh)
-
-
-def close_logs():
-    handlers = logger.handlers[:]
-    for handler in handlers:
-        handler.close()
-        logger.removeHandler(handler)
 
 
 def get(url, auth):
@@ -80,9 +63,13 @@ def get(url, auth):
 
 
 if __name__ == '__main__':
+    global logger
+    logger = tutil.setup_logging("CamAcq")
+    if 'PYLOGLEVEL' in os.environ:
+        level = logging.getLevelName(os.getenv('PYLOGLEVEL', 'DEBUG'))
+        logger.setLevel(level)
+
     args = parser.parse_args()
-    if args.logfile:
-        set_logfile(args.logfile)
     logger.info('Starting: %s' % NOW.strftime(TFMT))
     config = read_config(args.config)
     r = get(config['url'], config['auth'])
@@ -141,4 +128,4 @@ if __name__ == '__main__':
     os.remove(tmpjs)
 
     logger.info('Finished at: %s' % datetime.now().strftime(TFMT))
-    close_logs()
+    logging.shutdown()
