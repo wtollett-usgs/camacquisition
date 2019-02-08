@@ -1,4 +1,4 @@
-imread~=0.6.1
+imread~=0.7.0
 numpy~=1.15.0
 Pillow~=5.2.0
 requests~=2.19.1

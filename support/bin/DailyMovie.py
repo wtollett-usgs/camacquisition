@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import tomputils.util as tutil
@@ -22,19 +22,9 @@ parser.add_argument('-d', '--date', type=str, required=False,
 
 def read_config(config_file):
     logger.debug(f'Reading config file: {config_file}')
-    camera_code = None
-    name = None
-    pattern = re.compile('[\t\n="()]')
     with open(config_file, 'r') as f:
-        for line in f:
-            line = pattern.sub('', line)
-            spl = line.split(' ')
-            if spl[1] == 'cameraCode':
-                camera_code = spl[2]
-            elif spl[1] == 'name':
-                name = spl[2]
-    logger.debug(f'Camera: {camera_code}, Name: {name}')
-    return camera_code, name
+        j = json.load(f)
+        return j['cam'], j['name']
 
 
 def parse_date(in_date=None):
