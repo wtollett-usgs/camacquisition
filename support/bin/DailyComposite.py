@@ -15,8 +15,8 @@ from datetime import date, datetime, timedelta
 from imread import imread, imsave
 from PIL import Image
 
-ARCHIVE = '/Users/wtollett/Desktop/data/cams'
-COMPLOC = '/Users/wtollett/Desktop/data/cams/{}/composites'
+ARCHIVE = '/data/cams'
+COMPLOC = '/data/cams/{}/composites'
 COMPARCH = '{}/archive/{}/{}'
 TMPDIR = '/tmp'
 TFMT = '%Y-%m-%d %H:%M'

@@ -21,7 +21,7 @@ def prune_data(cam):
     ten_days_ago = now.timestamp() - 10 * 86400
     camdir = f'/data/cams/{cam}'
     idir = f'{camdir}/images/archive/{year}/{month}/{day}'
-    cdir = f'{camdir}/composites/{year}/{month}'
+    cdir = f'{camdir}/composites/archive/{year}/{month}'
     mdir = f'{camdir}/movies'
 
     # Delete empty images files from hours folders
