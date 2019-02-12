@@ -8,7 +8,6 @@ import logging
 import numpy as np
 import os
 import shutil
-import sys
 import tomputils.util as tutil
 
 from datetime import date, datetime, timedelta
