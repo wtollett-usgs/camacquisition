@@ -28,10 +28,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', type=str, required=True,
                     help='Config file')
 
-# ToDo:
-# 1. Reset logfiles every hour
-# 3. Email errors to defined email list
-
 
 def read_config(configfile):
     logger.debug(f'Reading configfile: {configfile}')
