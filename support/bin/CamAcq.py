@@ -35,7 +35,7 @@ def read_config(configfile):
         return json.load(f)
 
 
-def get(url, auth=None):
+def get(url, timeout, auth=None):
     with requests.session() as s:
         s.keep_alive = False
         try:
@@ -47,16 +47,16 @@ def get(url, auth=None):
                 else:
                     mauth = requests.auth.HTTPBasicAuth(auth['user'],
                                                         auth['passwd'])
-                return requests.get(url, auth=mauth, timeout=20)
+                return requests.get(url, auth=mauth, timeout=timeout)
             else:
-                return requests.get(url, timeout=20)
+                return requests.get(url, timeout=timeout)
         except Exception:
-            if datetime.now() > NOW + timedelta(seconds=50):
+            if datetime.now() > NOW + timedelta(seconds=55):
                 logger.info('Giving up.')
                 sys.exit()
             else:
                 time.sleep(5)
-                return get(url, auth)
+                return get(url, auth, timeout)
         finally:
             s.close()
 
@@ -71,10 +71,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logger.info('Starting')
     config = read_config(args.config)
+
+    timeout = 20
+    if 'timeout' in config:
+        timeout = config['timeout']
+
     if 'auth' in config:
-        r = get(config['url'], config['auth'])
+        r = get(config['url'], config['auth'], timeout)
     else:
-        r = get(config['url'])
+        r = get(config['url'], timeout)
     logger.debug('Got image')
 
     # Set up variables based on config
