@@ -1,3 +1,7 @@
+# CamAcquisition
+
+[![Build Status](https://travis-ci.com/wtollett-usgs/camacquisition.svg?branch=master)](https://travis-ci.com/wtollett-usgs/camacquisition)
+
 ## Usage
 ---
 Expected volume mounts:
