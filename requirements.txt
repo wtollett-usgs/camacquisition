@@ -1,5 +1,5 @@
 imread~=0.7.0
 numpy~=1.16.1
 Pillow~=5.2.0
-requests~=2.19.1
+requests~=2.22.0
 tomputils~=1.11.1

@@ -1,13 +1,8 @@
-FROM python:3.7
+FROM python:3.7-slim
 
-RUN apt-get update && apt-get -y install cron imagemagick mencoder tcsh wget
-
-WORKDIR /root/certs
-COPY support/DOIRootCA2.cer .
-
-WORKDIR /usr/share/ca-certificates/extra
-COPY support/DOIRootCA2.cer DOIRootCA2.crt
-RUN echo "extra/DOIRootCA2.crt" >> /etc/ca-certificates.conf && update-ca-certificates
+RUN apt-get update \
+    && apt-get -y install curl libcurl4-openssl-dev libssl-dev gcc mencoder \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1500 -r geology \
     && useradd -u 1500 -g geology -s /sbin/nologin geod
