@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import cv2
 import json
 import logging
 import os
 import shutil
-import subprocess
 import tomputils.util as tutil
 
 from datetime import datetime, timedelta
@@ -23,8 +23,7 @@ parser.add_argument('-d', '--date', type=str, required=False,
 def read_config(config_file):
     logger.debug(f'Reading config file: {config_file}')
     with open(config_file, 'r') as f:
-        j = json.load(f)
-        return j['cam'], j['name']
+        return json.load(f)
 
 
 def parse_date(in_date=None):
@@ -38,21 +37,25 @@ def parse_date(in_date=None):
     return str(now.year), str(now.month).zfill(2), str(now.day).zfill(2)
 
 
-def get_files(rootdir, filelist):
+def get_files(rootdir):
     files = []
     for filename in glob(f'{rootdir}/**/*.jpg', recursive=True):
         files.append(filename)
-    with open(filelist, 'wb') as f:
-        f.write(str.encode('\n'.join(sorted(files))))
-    return files
+    return sorted(files)
 
 
-def create_and_copy_video(filelist, tmpmovie, moviedir):
-    # Create movie
-    cmd = ['mencoder', f'mf://@{filelist}', '-mf', 'fps=10', '-ovc',
-           'lavc', '-lavcopts', 'vcodec=mjpeg:vbitrate=1000', '-o',
-           tmpmovie]
-    subprocess.call(cmd)
+def create_and_copy_video(files, tmpmovie, moviedir, goes):
+    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    if goes:
+        img = cv2.imread(files[0])
+        h, w = img.shape[:2]
+        size = [w, h]
+    else:
+        size = config['size']
+    video = cv2.VideoWriter(tmpmovie, fourcc, 10, (size[0], size[1]))
+    for img in files:
+        video.write(cv2.imread(img))
+    video.release()
     # Copy movie
     logger.info(f'Copying file to {moviedir}')
     shutil.copy2(tmpmovie, moviedir)
@@ -60,18 +63,16 @@ def create_and_copy_video(filelist, tmpmovie, moviedir):
     os.remove(tmpmovie)
 
 
-def create_video(imagedir, filelist, tmpmovie, moviedir):
+def create_video(imagedir, tmpmovie, moviedir, goes=False):
     # Get file list
-    files = get_files(imagedir, filelist)
+    files = get_files(imagedir)
 
     if len(files) > 0:
         # Create movie
         logger.debug(f'Found {len(files)} images. Starting encode.')
-        create_and_copy_video(filelist, tmpmovie, moviedir)
+        create_and_copy_video(files, tmpmovie, moviedir, goes)
     else:
         logger.debug("No image files -- exiting")
-
-    os.remove(filelist)
 
 
 def goes_video(in_date=None):
@@ -79,22 +80,22 @@ def goes_video(in_date=None):
     logger.info(f'Starting goes video creation for {year}-{month}-{day}')
     movie_name = f'goes{year}{month}{day}.avi'
     tmp_movie = f'/tmp/{movie_name}'
-    filelist = f'{tmp_movie}.movie.txt'
     moviedir = f'/data/www/remote_sensing/goes/movies/'
     imagedir = f'/data/www/remote_sensing/goes/images/{year}/{month}/{day}'
-    create_video(imagedir, filelist, tmp_movie, moviedir)
+    create_video(imagedir, tmp_movie, moviedir, goes=True)
 
 
-def cam_video(camera_code, name, in_date=None):
+def cam_video(in_date=None):
+    cam = config['cam']
+    name = config['name']
     year, month, day = parse_date(in_date)
     logger.info('Starting video creation for %s, date = %s'
-                % (camera_code, f'{year}-{month}-{day}'))
-    movie_name = f'{camera_code}{year}{month}{day}{name}.avi'
+                % (cam, f'{year}-{month}-{day}'))
+    movie_name = f'{cam}{year}{month}{day}{name}.avi'
     tmp_movie = f'/tmp/{movie_name}'
-    filelist = f'{tmp_movie}.movie.txt'
-    moviedir = f'/data/cams/{camera_code}/movies/'
-    imagedir = f'/data/cams/{camera_code}/images/archive/{year}/{month}/{day}'
-    create_video(imagedir, filelist, tmp_movie, moviedir)
+    moviedir = f'/data/cams/{cam}/movies/'
+    imagedir = f'/data/cams/{cam}/images/archive/{year}/{month}/{day}'
+    create_video(imagedir, tmp_movie, moviedir)
 
 
 if __name__ == '__main__':
@@ -106,8 +107,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.config:
-        camera_code, name = read_config(args.config)
-        cam_video(camera_code, name, args.date)
+        global config
+        config = read_config(args.config)
+        cam_video(args.date)
     else:
         goes_video(args.date)
     logging.info('Finished creating video.')

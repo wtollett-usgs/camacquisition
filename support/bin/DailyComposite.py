@@ -11,7 +11,7 @@ import shutil
 import tomputils.util as tutil
 
 from datetime import date, datetime, timedelta
-from imread import imread, imsave
+from cv2 import imread, imwrite
 from PIL import Image
 
 ARCHIVE = '/data/cams'
@@ -181,7 +181,7 @@ def create_composite(cam, name, size, webcopy, idate=None):
     # Write the composite image to a file
     composite_name = f'{cam}{eyear}{emonth}{eday}{name}.jpg'
     filelocation = f'{TMPDIR}/{composite_name}'
-    imsave(filelocation, Amax)
+    imwrite(filelocation, Amax)
 
     # Copy to various places
     if webcopy:
