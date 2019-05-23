@@ -4,10 +4,12 @@
 import argparse
 import logging
 import os
-import tomputils.util as tutil
+import Util as my_utils
 
 from datetime import datetime
 from glob import glob
+
+logger = my_utils.setup_logging("PruneData Log")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--cam', type=str, required=True, help='Camera code')
@@ -44,8 +46,6 @@ def prune_data(cam):
 
 
 if __name__ == '__main__':
-    global logger
-    logger = tutil.setup_logging("PruneData")
     if 'PYLOGLEVEL' in os.environ:
         level = logging.getLevelName(os.getenv('PYLOGLEVEL', 'DEBUG'))
         logger.setLevel(level)

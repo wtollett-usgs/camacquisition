@@ -1,8 +1,7 @@
 FROM python:3.7-slim
 
 RUN apt-get update \
-    && apt-get -y install \
-        curl gcc libcurl4-openssl-dev libglib2.0-0 libssl-dev \
+    && apt-get -y install curl gcc libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1500 -r geology \

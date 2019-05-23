@@ -7,10 +7,12 @@ import json
 import logging
 import os
 import shutil
-import tomputils.util as tutil
+import Util as my_utils
 
 from datetime import datetime, timedelta
 from glob import glob
+
+logger = my_utils.setup_logging("DailyMovie Log")
 
 # Argparse
 parser = argparse.ArgumentParser()
@@ -99,8 +101,6 @@ def cam_video(in_date=None):
 
 
 if __name__ == '__main__':
-    global logger
-    logger = tutil.setup_logging("DailyMovie")
     if 'PYLOGLEVEL' in os.environ:
         level = logging.getLevelName(os.getenv('PYLOGLEVEL', 'DEBUG'))
         logger.setLevel(level)

@@ -9,7 +9,7 @@ import requests
 import shutil
 import sys
 import time
-import tomputils.util as tutil
+import Util as my_utils
 
 from datetime import datetime, timedelta
 from PIL import Image
@@ -22,6 +22,8 @@ ARCHPATH = '/data/cams/{0}/images/archive/{1}/{2}/{3}/{4}'
 IMG = '/data/cams/{0}/images/{1}'
 WATERMARK = '/app/camacquisition/bin/usgs_watermark_wht.png'
 TFMT = '%Y-%m-%d %H:%M:%S'
+
+logger = my_utils.setup_logging("CamAcq Log")
 
 # Argparse
 parser = argparse.ArgumentParser()
@@ -62,8 +64,6 @@ def get(url, timeout, auth=None):
 
 
 if __name__ == '__main__':
-    global logger
-    logger = tutil.setup_logging("CamAcq")
     if 'PYLOGLEVEL' in os.environ:
         level = logging.getLevelName(os.getenv('PYLOGLEVEL', 'DEBUG'))
         logger.setLevel(level)

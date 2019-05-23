@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import os
 import shutil
-import tomputils.util as tutil
+import Util as my_utils
 
 from datetime import date, datetime, timedelta
 from cv2 import imread, imwrite
@@ -19,6 +19,8 @@ COMPLOC = '/data/cams/{}/composites'
 COMPARCH = '{}/archive/{}/{}'
 TMPDIR = '/tmp'
 TFMT = '%Y-%m-%d %H:%M'
+
+logger = my_utils.setup_logging("DailyComposite Log")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', type=str, required=True,
@@ -205,8 +207,6 @@ def create_composite(cam, name, size, webcopy, idate=None):
 
 
 if __name__ == '__main__':
-    global logger
-    logger = tutil.setup_logging("CompositesDaily")
     if 'PYLOGLEVEL' in os.environ:
         level = logging.getLevelName(os.getenv('PYLOGLEVEL', 'DEBUG'))
         logger.setLevel(level)
