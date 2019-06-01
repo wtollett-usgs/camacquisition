@@ -12,7 +12,7 @@ from glob import glob
 from PIL import Image
 
 TM_FORMAT = '%Y-%m-%d %H:%M:%S'
-DIR = os.getenv('CAMSDIR', '/lamp/cams')
+DIR = os.getenv('CAMSDIR', '/data/cams')
 YR_PATH = '{}/{}/images/archive/{}'
 TMP = '/tmp/gif'
 
