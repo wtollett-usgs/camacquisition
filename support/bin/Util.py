@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import json
 import logging
+
+
+def read_json_config(config_file):
+    logger.debug(f'Reading config file: {config_file}')
+    with open(config_file, 'r') as f:
+        return json.load(f)
 
 
 def setup_logging(name="Error logs"):
