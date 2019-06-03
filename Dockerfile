@@ -1,7 +1,7 @@
 FROM python:3.7-slim
 
 RUN apt-get update \
-    && apt-get -y install curl gcc libglib2.0-0 \
+    && apt-get -y install curl gcc libglib2.0-0 imagemagick\
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1500 -r geology \

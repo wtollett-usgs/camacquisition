@@ -5,11 +5,11 @@ import argparse
 import logging
 import os
 import shutil
+import subprocess
 import Util as my_utils
 
 from datetime import datetime, timedelta
 from glob import glob
-from PIL import Image
 
 TM_FORMAT = '%Y-%m-%d %H:%M:%S'
 DIR = os.getenv('CAMSDIR', '/data/cams')
@@ -53,29 +53,38 @@ def gather_images():
                                                              now.month,
                                                              now.day, 00,
                                                              30), now)
-    pth = YR_PATH.format(DIR, cam, now.year)
+    count = 0
+    ypath = YR_PATH.format(DIR, cam, now.year)
     if not os.path.exists(f'{TMP}/{cam}'):
         os.makedirs(f'{TMP}/{cam}')
     for mkey, mval in months.items():
         for dkey, dval in mval.items():
             for h in dval:
-                os.chdir(f'{pth}/{mkey.zfill(2)}/{dkey.zfill(2)}/{h.zfill(0)}')
-                logger.info(f'Grabbing files from {os.getcwd()}')
-                imgs = glob('*.jpg')
-                shutil.copy2(sorted(imgs)[0], f'{TMP}/{cam}')
+                p = f'{ypath}/{mkey.zfill(2)}/{dkey.zfill(2)}/{h.zfill(0)}'
+                if os.path.exists(p):
+                    os.chdir(p)
+                    logger.info(f'Grabbing files from {os.getcwd()}')
+                    imgs = glob('*.jpg')
+                    if imgs:
+                        shutil.copy2(sorted(imgs)[0], f'{TMP}/{cam}')
+                        count += 1
+                    else:
+                        logger.info('No images in directory.')
+                else:
+                    logger.info('Directory doesn\'t exist.')
+    return count
 
 
 def create_gif():
     logger.info('Creating gif')
     os.chdir(f'{TMP}/{config["cam"]}')
     imgs = sorted(glob('*.jpg'))
-    img = Image.open(imgs[0])
-    otherimgs = [Image.open(i) for i in imgs[1:]]
-    img.save(f'{config["cam"]}.gif', save_all=True,
-             append_images=otherimgs, duration=300, loop=1)
-    img.close()
-    for i in otherimgs:
-        i.close()
+    if imgs:
+        cmd = ['convert', '+dither', '-layers', 'OptimizePlus', '-delay', '15',
+               '-colors', '32', '*.jpg', f'{config["cam"]}.gif']
+        subprocess.call(cmd)
+    else:
+        logger.info('No images, quitting')
 
 
 def copy_to_server():
@@ -102,9 +111,12 @@ if __name__ == '__main__':
     logger.info('Starting')
     global config
     config = my_utils.read_json_config(args.config)
-    gather_images()
-    create_gif()
-    copy_to_server()
-    cleanup()
+    count = gather_images()
+    if count > 0:
+        create_gif()
+        copy_to_server()
+        cleanup()
+    else:
+        logger.info('No images collected.')
     logger.info('Finished')
     logging.shutdown()
