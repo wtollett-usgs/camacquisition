@@ -76,12 +76,16 @@ def gather_images():
 
 
 def create_gif():
-    logger.info('Creating gif')
     os.chdir(f'{TMP}/{config["cam"]}')
     imgs = sorted(glob('*.jpg'))
     if imgs:
-        cmd = ['convert', '+dither', '-layers', 'OptimizePlus', '-delay', '15',
-               '-colors', '32', '*.jpg', f'{config["cam"]}.gif']
+        if config['size'][0] > 1920:
+            logger.info('Downsizing large images.')
+            cmd = ['mogrify', '-resize', '1920', '*.jpg']
+            subprocess.call(cmd)
+        logger.info('Creating gif')
+        cmd = ['convert', '+dither', '-layers', 'Optimize', '-delay', '15',
+               '*.jpg', f'{config["cam"]}.gif']
         subprocess.call(cmd)
     else:
         logger.info('No images, quitting')
@@ -97,7 +101,7 @@ def cleanup():
     os.chdir(f'{TMP}/{config["cam"]}')
     logger.info('Cleaning up')
     os.remove(f'{config["cam"]}.gif')
-    files = glob('*.jpg')
+    files = glob('*.jpg*')
     for f in files:
         os.remove(f)
 

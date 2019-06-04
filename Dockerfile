@@ -1,5 +1,7 @@
 FROM python:3.7-slim
 
+LABEL maintainer="wtollett@usgs.gov"
+
 RUN apt-get update \
     && apt-get -y install curl gcc libglib2.0-0 imagemagick\
     && rm -rf /var/lib/apt/lists/*
