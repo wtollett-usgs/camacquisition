@@ -83,6 +83,12 @@ def create_gif():
             logger.info('Downsizing large images.')
             cmd = ['mogrify', '-resize', '1920', '*.jpg']
             subprocess.call(cmd)
+        if config['cam'] in ['L3cam', 'L4cam', 'L8cam', 'LPcam']:
+            logger.info('Blacking out SPARTAN logo')
+            rect = 'rectangle 0,930,140,960'
+            cmd = ['mogrify', '-fill', 'black', '-draw',
+                   rect, '*.jpg']
+            subprocess.call(cmd)
         logger.info('Creating gif')
         cmd = ['convert', '+dither', '-layers', 'Optimize', '-delay', '15',
                '*.jpg', f'{config["cam"]}.gif']
