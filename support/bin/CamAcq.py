@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # Copy to archive
     if not os.path.exists(path):
         logger.debug(f'Creating new archive dir: {path}')
-        os.makedirs(path)
+        os.makedirs(path, 2775)
     logger.debug('Copying to archive')
     tm = datetime.now()
     shutil.copy2(tmpfile, f"{path}/{tm.strftime('%Y%m%d%H%M%S')}{iname}.jpg")

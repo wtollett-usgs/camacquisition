@@ -56,7 +56,7 @@ def gather_images():
     count = 0
     ypath = YR_PATH.format(DIR, cam, now.year)
     if not os.path.exists(f'{TMP}/{cam}'):
-        os.makedirs(f'{TMP}/{cam}')
+        os.makedirs(f'{TMP}/{cam}', 2775)
     for mkey, mval in months.items():
         for dkey, dval in mval.items():
             for h in dval:

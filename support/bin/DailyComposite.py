@@ -39,7 +39,7 @@ def read_config(configfile):
 def copy_to_archive(tmpfile, path, imgname):
     if not os.path.exists(path):
         logger.debug(f'Creating new directory: {path}')
-        os.makedirs(path)
+        os.makedirs(path, 2775)
     logger.info(f'Copying {tmpfile} to {path}')
     shutil.copy2(tmpfile, f'{path}/{imgname}')
 
