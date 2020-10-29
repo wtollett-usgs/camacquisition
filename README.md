@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.com/wtollett-usgs/camacquisition.svg?branch=master)](https://travis-ci.com/wtollett-usgs/camacquisition)
 
+Project archived and now hosted at [code.usgs.gov](https://code.usgs.gov/vsc/hvo/camacquisition)
+
 ## Usage
 ---
 Expected volume mounts:
